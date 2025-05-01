@@ -3,6 +3,7 @@ import EventDescription from "@/components/event-description"
 import RegistrationForm from "@/components/registration-form"
 import EventDetails from "@/components/event-details"
 import Footer from "@/components/footer"
+import DebugButton from "@/components/debug-button"
 
 export default function Home() {
   return (
@@ -12,6 +13,7 @@ export default function Home() {
         <EventDescription />
         <EventDetails />
         <RegistrationForm />
+        <DebugButton />
       </div>
       <Footer />
     </main>

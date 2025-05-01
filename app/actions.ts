@@ -14,24 +14,68 @@ type RegistrationData = {
 
 export async function submitRegistration(data: RegistrationData) {
   try {
-    // Create a JWT client using environment variables
+    console.log("Starting registration submission process...")
+
+    // Validate environment variables
+    if (!process.env.GOOGLE_SHEETS_CLIENT_EMAIL) {
+      throw new Error("GOOGLE_SHEETS_CLIENT_EMAIL environment variable is missing")
+    }
+
+    if (!process.env.GOOGLE_SHEETS_PRIVATE_KEY) {
+      throw new Error("GOOGLE_SHEETS_PRIVATE_KEY environment variable is missing")
+    }
+
+    if (!process.env.GOOGLE_SHEETS_SHEET_ID) {
+      throw new Error("GOOGLE_SHEETS_SHEET_ID environment variable is missing")
+    }
+
+    // Log the sheet ID (partially redacted for security)
+    const sheetId = process.env.GOOGLE_SHEETS_SHEET_ID
+    const redactedSheetId = sheetId.substring(0, 5) + "..." + sheetId.substring(sheetId.length - 5)
+    console.log(`Using Google Sheet ID: ${redactedSheetId}`)
+
+    // Format the private key correctly
+    // The private key from Google often contains escaped newlines that need to be converted
+    const privateKey = process.env.GOOGLE_SHEETS_PRIVATE_KEY.replace(/\\n/g, "\n")
+
+    console.log("Creating JWT client...")
     const serviceAccountAuth = new JWT({
       email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
-      key: process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+      key: privateKey,
       scopes: ["https://www.googleapis.com/auth/spreadsheets"],
     })
 
-    // Initialize the sheet
-    const doc = new GoogleSpreadsheet(process.env.GOOGLE_SHEETS_SHEET_ID as string, serviceAccountAuth)
+    console.log("Initializing Google Spreadsheet...")
+    const doc = new GoogleSpreadsheet(sheetId, serviceAccountAuth)
 
-    // Load the document info and sheets
+    console.log("Loading document info...")
     await doc.loadInfo()
+    console.log(`Document title: "${doc.title}"`)
+
+    // Check if the document has any sheets
+    if (doc.sheetCount === 0) {
+      throw new Error("The Google Sheet document doesn't contain any sheets")
+    }
+
+    console.log(`Document has ${doc.sheetCount} sheet(s)`)
 
     // Get the first sheet
     const sheet = doc.sheetsByIndex[0]
+    console.log(`Using sheet: "${sheet.title}" (${sheet.rowCount} rows)`)
 
-    // Add a row with the registration data
-    await sheet.addRow({
+    // Check if the sheet has headers
+    const rows = await sheet.getRows()
+    if (rows.length === 0) {
+      console.log("Sheet appears to be empty. Adding headers...")
+      await sheet.setHeaderRow(["Name", "Email", "Contact", "College", "Branch", "Year", "RegistrationDate"])
+      console.log("Headers added successfully")
+    } else {
+      console.log("Sheet already has data. Current headers:", sheet.headerValues)
+    }
+
+    // Add the new registration data
+    console.log("Adding new registration data...")
+    const newRow = {
       Name: data.name,
       Email: data.email,
       Contact: data.contact,
@@ -39,11 +83,18 @@ export async function submitRegistration(data: RegistrationData) {
       Branch: data.branch,
       Year: data.year,
       RegistrationDate: new Date().toISOString(),
-    })
+    }
 
+    console.log("Row data:", JSON.stringify(newRow))
+    await sheet.addRow(newRow)
+
+    console.log("Registration data added successfully!")
     return { success: true }
   } catch (error) {
-    console.error("Error submitting registration:", error)
-    throw new Error("Failed to submit registration")
+    console.error("Error in submitRegistration:", error)
+    if (error instanceof Error) {
+      throw new Error(`Registration failed: ${error.message}`)
+    }
+    throw new Error("Registration failed due to an unknown error")
   }
 }

@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { submitRegistration } from "@/app/actions"
 import { Loader2, CheckCircle } from "lucide-react"
 
 const formSchema = z.object({
@@ -51,7 +50,21 @@ export default function RegistrationForm() {
     setError(null)
 
     try {
-      await submitRegistration(data)
+      // Use fetch instead of the server action
+      const response = await fetch("/api/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      })
+
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to submit registration")
+      }
+
       setIsSuccess(true)
       reset()
       setYearValue("")
